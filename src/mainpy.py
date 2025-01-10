@@ -11,14 +11,14 @@ import urllib.request
 from db import get_db_connection
 from datetime import datetime, timedelta
 import time
-import torch
-from transformers import BartForConditionalGeneration, PreTrainedTokenizerFast
 
-api_key_path2 = '/home/hserver/project/yourvideopro/important/01_G/APIkey.json'
-MODEL_DIR = "model"
 
-def load_gemini_api_key():
-    api_key_path = "important/01_G/APIkey.json"
+# 테스트시 해당경로에 key를 넣어주세요 (APIkey.json)
+# 잊지말고 테스트 종료 후에는 key를 지우십시오!
+api_key_path2 = '/key/APIkey.json'
+
+def load_gemini_api_key(api_key_path2):
+    api_key_path = "D:\important\APIkey.json"
     try:
         with open(api_key_path, 'r') as file:
             data = json.load(file)
@@ -38,7 +38,7 @@ def load_gemini_api_key():
         print("API 키 파일의 JSON 형식이 올바르지 않습니다.")
         return None
     
-gemini_key, youtube_key, naver_id, naver_key = load_gemini_api_key()
+gemini_key, youtube_key, naver_id, naver_key = load_gemini_api_key(api_key_path2)
 
 if gemini_key:
     try:
@@ -190,89 +190,6 @@ def media_script(video_id, job_id):
         answer = answer.strip()
         answer = answer.replace("'","")
         return answer
-    
-    def summary(scripts):
-        def test_model(input_text, model_dir=MODEL_DIR, max_source_length=1024, max_target_length=128):
-            """
-            학습 완료된 KoBART 모델로 요약을 수행하는 함수
-            """
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-            # 1) 토크나이저 / 모델 불러오기
-            tokenizer = PreTrainedTokenizerFast.from_pretrained(model_dir)
-            model = BartForConditionalGeneration.from_pretrained(model_dir)
-
-            model.to(device)
-            model.eval()
-
-            # 2) 입력 텍스트 토큰화
-            inputs = tokenizer(
-                input_text,
-                return_tensors="pt",
-                max_length=max_source_length,
-                truncation=True
-            ).to(device)
-
-            # 3) 요약 생성 (샘플링 or 빔서치)
-            with torch.no_grad():
-                summary_ids = model.generate(
-                    inputs["input_ids"],
-                    attention_mask=inputs["attention_mask"],
-                    num_beams=4,
-                    max_length=max_target_length,
-                    early_stopping=True
-                )
-
-            # 4) 디코딩
-            summary_text = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-            
-            return summary_text
-
-        def split_and_summarize(scripts, model_dir=MODEL_DIR):
-            chunks = [scripts[i:i+1024] for i in range(0, len(scripts), 1024)]
-            summaries = []
-            for chunk in chunks:
-                summary = test_model(chunk, model_dir=model_dir)
-                if len(summary) >= 50:  # 조건 완화
-                    summaries.append(summary)
-            return summaries
-
-        def summarize_final(summaries, model_dir=MODEL_DIR):
-            """
-            개별 요약 정보를 다시 하나로 합쳐 최종 요약을 생성하는 함수
-            """
-            combined_text = " ".join(summaries)
-            final_summary = test_model(combined_text, model_dir=model_dir)
-            return final_summary
-        
-        cleaned_list = []
-        
-        for line in scripts:
-            if "한글:" in line:
-                parts = line.split("한글:", 1)
-                cleaned_line = parts[1].strip()
-                cleaned_list.append(cleaned_line)
-            else:
-                cleaned_list.append(line)
-        
-        scripts = " ".join(cleaned_list)
-
-        # 요약 실행
-        summaries = split_and_summarize(scripts)
-        resurt_summary = ''
-
-        # 요약 결과 출력
-        if summaries:
-            for idx, summary in enumerate(summaries):
-                resurt_summary += f"\n요약 {idx + 1} : {summary}"
-
-            # 최종 요약 생성
-            final_summary = summarize_final(summaries)
-            resurt_summary += f"\n최종 요약 : {final_summary}"
-        else:
-            print("===== 요약 결과 없음 =====")
-        
-        return resurt_summary
     
     def get_caption_info(video_id):
         try:
@@ -432,9 +349,7 @@ def media_script(video_id, job_id):
         update_progress(None, None, None, non_script=True)
         return ["해당영상은 자막정보를 제공하지않습니다."], "자막정보를 제공하지 않는 동영상은 AI요약정보를 제공하지 않습니다."
     
-    ko_summary = ''
-    ko_summary += "-- GEMINI 요약 --\n" + summary_ge(ko_script)
-    ko_summary += "\n\n-- you_model 요약 --\n" + summary(ko_script)
+    ko_summary =summary_ge(ko_script)
     
     return script, ko_summary
 
